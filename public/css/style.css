@@ -225,7 +225,7 @@ img { -webkit-user-drag: none; }
   position: absolute; top: max(14px, env(safe-area-inset-top)); left: 16px; right: 16px;
   display: flex; justify-content: space-between; align-items: center;
 }
-.hero { position: relative; height: min(170px, 22vh); display: flex; justify-content: center; }
+.hero { position: relative; height: min(220px, 27vh); display: flex; justify-content: center; }
 .hero-dino { height: 100%; filter: drop-shadow(0 10px 6px rgba(0, 0, 0, .35)); }
 .bob { animation: bob 1.2s ease-in-out infinite; transform-origin: 50% 100%; }
 @keyframes bob { 50% { transform: translateY(-8px) scale(1.02, .98); } }

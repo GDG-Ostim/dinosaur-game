@@ -28,7 +28,7 @@ const SPEED_MAX = 1150;
 const SPEED_ACCEL = 9;       // her saniye
 const SCORE_RATE = 0.01;     // birim mesafe başına skor
 const COIN_VALUE = 10;
-const DINO_H = 92;           // koşma pozunun çizim yüksekliği
+const DINO_H = 104;          // koşma pozunun çizim yüksekliği
 
 // Engel tipleri: çizim yüksekliği ve hitbox içe payları (oran).
 const OBSTACLES = {
@@ -489,6 +489,9 @@ export class Game {
     ctx.translate(d.x + w / 2, bottom + bob);
     ctx.scale(1 + sq * 0.6, 1 - sq);
     if (this.state === 'over') ctx.rotate(-0.08);
+    // Arka plandan ayrışsın diye hafif beyaz parıltı.
+    ctx.shadowColor = 'rgba(255, 255, 255, 0.85)';
+    ctx.shadowBlur = 10 * this.scale;
     if (img) ctx.drawImage(img, -w / 2, -h, w, h);
     else { ctx.fillStyle = '#7cc243'; ctx.fillRect(-w / 2, -h, w, h); }
     ctx.restore();

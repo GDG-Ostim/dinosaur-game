@@ -272,12 +272,9 @@ app.get('/healthz', async () => ({ ok: true }));
 
 await app.register(fastifyStatic, {
   root: path.join(__dirname, 'public'),
-  setHeaders(res, filePath) {
-    if (/\.(png|webp|jpg|svg|mp3|ogg)$/.test(filePath)) {
-      res.setHeader('Cache-Control', 'public, max-age=86400');
-    } else {
-      res.setHeader('Cache-Control', 'no-cache');
-    }
+  // Her istekte ETag ile doğrulanır: yeni deploy'daki görseller anında görünür.
+  setHeaders(res) {
+    res.setHeader('Cache-Control', 'no-cache');
   },
 });
 
