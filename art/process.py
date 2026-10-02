@@ -12,7 +12,7 @@ OUT = Path(__file__).parent.parent / "public" / "assets"
 OUT.mkdir(parents=True, exist_ok=True)
 
 
-def remove_white(img: Image.Image, tol: int = 38) -> Image.Image:
+def remove_white(img: Image.Image, tol: int = 38, holes: bool = False) -> Image.Image:
     rgb = np.asarray(img.convert("RGB")).astype(np.int16)
     h, w, _ = rgb.shape
     # Beyaza uzaklık: kenardan erişilebilen açık pikseller arka plan sayılır.
@@ -36,6 +36,27 @@ def remove_white(img: Image.Image, tol: int = 38) -> Image.Image:
             if 0 <= ny < h and 0 <= nx < w and not bg[ny, nx] and near_white[ny, nx]:
                 bg[ny, nx] = True
                 q.append((ny, nx))
+    if holes:
+        # Kenara değmeyen ama büyük ve düz beyaz alanlar (kupa kulbu içi gibi) da arka plandır.
+        flat = dist < 36
+        seen = bg.copy()
+        min_hole = int(h * w * 0.0006)
+        for sy in range(h):
+            for sx in range(w):
+                if flat[sy, sx] and not seen[sy, sx]:
+                    region = [(sy, sx)]
+                    seen[sy, sx] = True
+                    i = 0
+                    while i < len(region):
+                        y, x = region[i]
+                        i += 1
+                        for ny, nx in ((y + 1, x), (y - 1, x), (y, x + 1), (y, x - 1)):
+                            if 0 <= ny < h and 0 <= nx < w and flat[ny, nx] and not seen[ny, nx]:
+                                seen[ny, nx] = True
+                                region.append((ny, nx))
+                    if len(region) >= min_hole:
+                        ys, xs = zip(*region)
+                        bg[list(ys), list(xs)] = True
     alpha = Image.fromarray(np.where(bg, 0, 255).astype(np.uint8))
     # Kenarları yumuşat ve beyaz haleyi biraz içeri çek.
     alpha = alpha.filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(1.2))
@@ -127,12 +148,14 @@ def sheet(src: str, names: list[str], max_h: int):
             save(fit(isolate(img, labels, {box[4]}, box), max_h), name)
 
 
-def pose_sheet(src: str, names: list[str], target_h: int):
+def pose_sheet(src: str, names: list[str], target_h: int, holes: bool = False):
     """Yatay poz şeridini keser; tüm pozlar aynı ölçekle küçültülür (ilk pozun yüksekliği = target_h)."""
     p = RAW / f"{src}.png"
     if not p.exists():
         return
-    img = remove_white(Image.open(p))
+    img = Image.open(p)
+    # Zaten şeffaf (ör. Higgsfield arka plan silici çıktısı) ise beyaz silmeyi atla.
+    img = img if img.mode == "RGBA" else remove_white(img, holes=holes)
     boxes, labels = components(img, min_area=200)
     boxes.sort(key=lambda b: (b[2] - b[0]) * (b[3] - b[1]), reverse=True)
     main = sorted(boxes[:len(names)], key=lambda b: b[0])
@@ -170,6 +193,7 @@ if __name__ == "__main__":
         "dino": lambda: (sprite("dino_base", "dino_base", 300),
                          pose_sheet("dino_sheet", ["dino_run1", "dino_run2", "dino_jump", "dino_duck", "dino_dead"], 260)),
         "obstacles": lambda: sheet("obstacles", ["cactus1", "cactus2", "cactus3", "ptero", "coin", "rock"], 260),
+        "icons": lambda: pose_sheet("icons_nobg", ["trophy", "medal", "sound_on", "sound_off", "exit"], 160),
         "bg": lambda: background("bg", "bg", 0.665),
         "logo": lambda: sprite("logo", "logo", 520, tol=30),
     }
