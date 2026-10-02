@@ -1,6 +1,6 @@
 # GDG Ostim · Dino Run
 
-Chrome'un çevrimdışı dinozor oyununun Playrix tarzı bir versiyonu. Okul mailiyle (`@atostimteknik.edu.tr`) giriş yapılır, en iyi skorlar liderlik tablosuna yazılır.
+Chrome'un çevrimdışı dinozor oyununun Playrix tarzı bir versiyonu. Okul mailiyle (`@ostimteknik.edu.tr`) giriş yapılır, en iyi skorlar liderlik tablosuna yazılır.
 
 - **Oyun:** `/`
 - **QR + canlı liderlik (projeksiyon için):** `/qr.html`
@@ -20,7 +20,7 @@ Node 22.13+ gerekir (yerleşik `node:sqlite` kullanılıyor). Veritabanı `data/
 |----------------|-------------------------|------------------------------------------------|
 | `PORT`         | `3000`                  | Sunucu portu                                   |
 | `DATA_DIR`     | `./data` (Docker: `/data`) | SQLite dosyasının klasörü                    |
-| `EMAIL_DOMAIN` | `atostimteknik.edu.tr`  | Giriş yapılabilecek mail uzantısı              |
+| `EMAIL_DOMAIN` | `ostimteknik.edu.tr`  | Giriş yapılabilecek mail uzantısı              |
 | `SECRET`       | otomatik                | Token imza anahtarı (yoksa DB'de üretilir)     |
 
 ## Dokploy ile yayınlama

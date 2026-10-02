@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
-const EMAIL_DOMAIN = (process.env.EMAIL_DOMAIN || 'atostimteknik.edu.tr').toLowerCase();
+const EMAIL_DOMAIN = (process.env.EMAIL_DOMAIN || 'ostimteknik.edu.tr').toLowerCase();
 
 // Oyunda mesafe skoru en fazla ~11.5/sn, coinler (10 puan) en fazla ~1/sn; biraz pay bırakıyoruz.
 const MAX_SCORE_PER_SEC = 25;

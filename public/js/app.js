@@ -63,8 +63,8 @@ $('login-form').addEventListener('submit', async (e) => {
   err.hidden = true;
   const name = $('login-name').value.trim();
   const email = $('login-email').value.trim().toLowerCase();
-  if (!/@atostimteknik\.edu\.tr$/.test(email)) {
-    err.textContent = 'Sadece @atostimteknik.edu.tr uzantılı okul mailinle giriş yapabilirsin.';
+  if (!/@ostimteknik\.edu\.tr$/.test(email)) {
+    err.textContent = 'Sadece @ostimteknik.edu.tr uzantılı okul mailinle giriş yapabilirsin.';
     err.hidden = false;
     return;
   }
