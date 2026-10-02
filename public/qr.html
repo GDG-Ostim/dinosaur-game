@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dino Run · QR</title>
+  <link rel="icon" href="assets/dino_base.png">
+  <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    body { overflow: auto; }
+    .tv { position: relative; min-height: 100vh; display: flex; flex-wrap: wrap; gap: 40px; align-items: center; justify-content: center; padding: 30px 16px; }
+    .tv-left { display: flex; flex-direction: column; align-items: center; gap: 18px; }
+    .qr-card { padding: 22px; border-radius: 28px; background: #fff; box-shadow: 0 0 0 6px var(--wood-dark), 0 14px 0 6px rgba(60, 25, 5, .55); }
+    #qr img, #qr canvas { display: block; width: min(360px, 70vw); height: auto; }
+    .url { font-family: var(--title); font-size: 26px; color: #fff; text-shadow: var(--outline); text-align: center; word-break: break-all; }
+    .tv .board { max-height: none; }
+  </style>
+</head>
+<body>
+  <div class="scene-bg"></div>
+  <main class="tv">
+    <div class="tv-left">
+      <img class="logo" src="assets/logo.png" alt="GDG Ostim Dino Run">
+      <div class="qr-card"><div id="qr"></div></div>
+      <div class="url" id="url"></div>
+    </div>
+    <div class="board panel">
+      <div class="ribbon ribbon-gold"><span>Liderlik Tablosu</span></div>
+      <p class="board-sub">Okut, oyna, zirveye çık! <span id="board-total"></span></p>
+      <ol id="board-list" class="board-list"></ol>
+    </div>
+  </main>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script>
+    const url = location.origin + '/';
+    document.getElementById('url').textContent = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    new QRCode(document.getElementById('qr'), { text: url, width: 720, height: 720, correctLevel: QRCode.CorrectLevel.M });
+
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    async function load() {
+      try {
+        const data = await (await fetch('/api/leaderboard?limit=10')).json();
+        document.getElementById('board-total').textContent = data.total ? `· ${data.total} oyuncu` : '';
+        document.getElementById('board-list').innerHTML = data.top.length ? data.top.map((r) => `
+          <li class="row">
+            <span class="rank${r.rank <= 3 ? ' r' + r.rank : ''}">${r.rank}</span>
+            <span class="name">${esc(r.name)}</span>
+            <span class="score"><img src="assets/coin.png" alt="">${r.best.toLocaleString('tr-TR')}</span>
+          </li>`).join('') : '<li class="board-empty">Henüz skor yok. İlk sen ol! 🦖</li>';
+      } catch { /* bir sonraki turda tekrar dener */ }
+    }
+    load();
+    setInterval(load, 5000);
+  </script>
+</body>
+</html>
