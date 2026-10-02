@@ -15,10 +15,15 @@ const EMAIL_DOMAIN = (process.env.EMAIL_DOMAIN || 'ostimteknik.edu.tr').toLowerC
 const MAX_SCORE_PER_SEC = 25;
 const RUN_TTL_MS = 60 * 60 * 1000;
 
-fs.mkdirSync(DATA_DIR, { recursive: true });
+const BACKUP_DIR = path.join(DATA_DIR, 'backups');
+const BACKUP_EVERY_MS = 10 * 60 * 1000;
+const BACKUP_KEEP = 100;
+
+fs.mkdirSync(BACKUP_DIR, { recursive: true });
 const db = new DatabaseSync(path.join(DATA_DIR, 'dino.db'));
 db.exec(`
   PRAGMA journal_mode = WAL;
+  PRAGMA synchronous = FULL;
   CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS players (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -30,7 +35,38 @@ db.exec(`
     created_at INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS players_best ON players (best DESC, best_at ASC);
+  -- Her biten oyunun kaydı (çekiliş öncesi denetim için; hiçbir zaman silinmez).
+  CREATE TABLE IF NOT EXISTS scores (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id  INTEGER NOT NULL REFERENCES players (id),
+    score      INTEGER NOT NULL,
+    duration   REAL NOT NULL,
+    counted    INTEGER NOT NULL DEFAULT 1,
+    created_at INTEGER NOT NULL
+  );
 `);
+
+const getMeta = (key) => db.prepare('SELECT value FROM meta WHERE key = ?').get(key)?.value ?? null;
+const setMeta = (key, value) =>
+  db.prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value').run(key, value);
+const isFrozen = () => getMeta('frozen') === '1';
+
+// Admin anahtarı: env yoksa bir kez üretilip DB'de saklanır ve loglara yazılır.
+const ADMIN_KEY = process.env.ADMIN_KEY || getMeta('admin_key') || (() => {
+  const key = crypto.randomBytes(12).toString('base64url');
+  setMeta('admin_key', key);
+  return key;
+})();
+
+// Yedekleme: tutarlı tam kopya (VACUUM INTO), en yeni BACKUP_KEEP adet tutulur.
+function backup(reason = 'periodic') {
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const file = path.join(BACKUP_DIR, `dino-${stamp}.db`);
+  db.exec(`VACUUM INTO '${file.replace(/'/g, "''")}'`);
+  const files = fs.readdirSync(BACKUP_DIR).filter((f) => f.endsWith('.db')).sort();
+  for (const old of files.slice(0, Math.max(0, files.length - BACKUP_KEEP))) fs.rmSync(path.join(BACKUP_DIR, old));
+  return { file: path.basename(file), reason };
+}
 
 // Token imzası için gizli anahtar: env yoksa DB'de saklanan kalıcı bir anahtar üret.
 function getSecret() {
@@ -65,6 +101,12 @@ const q = {
   top: db.prepare('SELECT id, name, best FROM players WHERE best > 0 ORDER BY best DESC, best_at ASC LIMIT ?'),
   rank: db.prepare('SELECT COUNT(*) + 1 AS rank FROM players WHERE best > ? OR (best = ? AND best_at < ?)'),
   count: db.prepare('SELECT COUNT(*) AS n FROM players WHERE best > 0'),
+  logScore: db.prepare('INSERT INTO scores (player_id, score, duration, counted, created_at) VALUES (?, ?, ?, ?, ?)'),
+  adminTop: db.prepare(`SELECT id, name, email, best, games, best_at, created_at FROM players
+                        WHERE best > 0 ORDER BY best DESC, best_at ASC LIMIT ?`),
+  adminAll: db.prepare(`SELECT id, name, email, best, games, best_at, created_at FROM players
+                        ORDER BY best DESC, best_at ASC`),
+  stats: db.prepare('SELECT COUNT(*) AS games, COALESCE(MAX(score), 0) AS max FROM scores'),
 };
 
 const publicPlayer = (p) => ({ id: p.id, name: p.name, best: p.best, games: p.games });
@@ -148,13 +190,16 @@ app.post('/api/run/finish', async (req, reply) => {
   }
   const previousBest = player.best;
   const now = Date.now();
-  q.setBest.run(score, now, player.id, score);
+  const frozen = isFrozen();
+  q.logScore.run(player.id, score, elapsed, frozen ? 0 : 1, now);
+  if (!frozen) q.setBest.run(score, now, player.id, score);
   const updated = q.byId.get(player.id);
   return {
     score,
     best: updated.best,
-    newBest: score > previousBest,
+    newBest: !frozen && score > previousBest,
     rank: rankOf(updated),
+    frozen,
   };
 });
 
@@ -168,7 +213,59 @@ app.get('/api/leaderboard', async (req) => {
     top: rows,
     total: q.count.get().n,
     me: me ? { id: me.id, name: me.name, best: me.best, rank: rankOf(me) } : null,
+    frozen: isFrozen(),
   };
+});
+
+// ---------- admin (çekiliş için) ----------
+function admin(req, reply) {
+  const key = String(req.headers['x-admin-key'] || req.query?.key || '');
+  const ok = key.length === ADMIN_KEY.length && crypto.timingSafeEqual(Buffer.from(key), Buffer.from(ADMIN_KEY));
+  if (!ok) reply.code(403).send({ error: 'Yetkisiz.' });
+  return ok;
+}
+const iso = (t) => (t ? new Date(t).toISOString() : '');
+
+app.get('/api/admin/top', async (req, reply) => {
+  if (!admin(req, reply)) return;
+  const limit = Math.min(Number(req.query?.limit) || 10, 500);
+  const backups = fs.readdirSync(BACKUP_DIR).filter((f) => f.endsWith('.db')).sort();
+  return {
+    frozen: isFrozen(),
+    frozenAt: getMeta('frozen_at'),
+    players: q.count.get().n,
+    ...q.stats.get(),
+    lastBackup: backups.at(-1) || null,
+    backupCount: backups.length,
+    top: q.adminTop.all(limit).map((r, i) => ({ rank: i + 1, ...r, best_at: iso(r.best_at) })),
+  };
+});
+
+app.get('/api/admin/export.csv', async (req, reply) => {
+  if (!admin(req, reply)) return;
+  const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const rows = q.adminAll.all();
+  const lines = [['sira', 'isim', 'email', 'en_iyi', 'oyun_sayisi', 'rekor_zamani', 'kayit_zamani'].join(',')];
+  rows.forEach((r, i) => lines.push([r.best > 0 ? i + 1 : '', r.name, r.email, r.best, r.games, iso(r.best_at), iso(r.created_at)].map(cell).join(',')));
+  reply
+    .header('Content-Type', 'text/csv; charset=utf-8')
+    .header('Content-Disposition', `attachment; filename="dino-liderlik-${Date.now()}.csv"`);
+  return '﻿' + lines.join('\n'); // BOM: Excel Türkçe karakterleri doğru açsın
+});
+
+app.post('/api/admin/freeze', async (req, reply) => {
+  if (!admin(req, reply)) return;
+  const frozen = Boolean(req.body?.frozen);
+  setMeta('frozen', frozen ? '1' : '0');
+  setMeta('frozen_at', frozen ? new Date().toISOString() : '');
+  const snap = backup(frozen ? 'freeze' : 'unfreeze');
+  req.log.info({ frozen, backup: snap.file }, 'yarışma durumu değişti');
+  return { frozen, backup: snap.file };
+});
+
+app.post('/api/admin/backup', async (req, reply) => {
+  if (!admin(req, reply)) return;
+  return backup('manual');
 });
 
 app.get('/healthz', async () => ({ ok: true }));
@@ -184,4 +281,20 @@ await app.register(fastifyStatic, {
   },
 });
 
-app.listen({ port: PORT, host: '0.0.0.0' });
+setInterval(() => {
+  try { backup(); } catch (err) { app.log.error(err, 'yedekleme başarısız'); }
+}, BACKUP_EVERY_MS).unref();
+
+// Kapanırken son bir yedek al ve veritabanını düzgün kapat.
+for (const sig of ['SIGTERM', 'SIGINT']) {
+  process.once(sig, async () => {
+    try { backup('shutdown'); } catch (err) { app.log.error(err, 'kapanış yedeği alınamadı'); }
+    await app.close();
+    db.close();
+    process.exit(0);
+  });
+}
+
+await app.listen({ port: PORT, host: '0.0.0.0' });
+app.log.info(`Veri klasörü: ${DATA_DIR} · admin paneli: /admin.html`);
+if (!process.env.ADMIN_KEY) app.log.warn(`ADMIN_KEY tanımlı değil; otomatik anahtar: ${ADMIN_KEY}`);

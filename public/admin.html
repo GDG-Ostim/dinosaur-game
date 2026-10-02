@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Dino Run · Yönetim</title>
+  <link rel="icon" href="assets/dino_base.png">
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    body { overflow: auto; }
+    .wrap { position: relative; max-width: 760px; margin: 0 auto; padding: 50px 16px 40px; display: flex; flex-direction: column; gap: 20px; }
+    .wrap .panel { width: 100%; }
+    .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+    .fact { padding: 10px 12px; border-radius: 14px; background: rgba(160, 90, 30, .12); }
+    .fact small { display: block; font-weight: 900; font-size: 12px; color: #a0693a; }
+    .fact b { font-family: var(--title); font-size: 22px; }
+    table { width: 100%; border-collapse: collapse; font-weight: 800; font-size: 14px; }
+    th, td { padding: 8px 6px; text-align: left; border-bottom: 2px solid rgba(160, 90, 30, .18); }
+    th { font-size: 12px; color: #a0693a; }
+    td.email { word-break: break-all; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+    .actions .btn { flex: 1 1 200px; }
+    .status-on { color: #c0261d; }
+    .status-off { color: #2f8f3a; }
+    #login[hidden], #dash[hidden] { display: none; }
+  </style>
+</head>
+<body>
+  <div class="scene-bg"></div>
+  <main class="wrap">
+    <form id="login" class="panel">
+      <div class="ribbon"><span>Yönetim</span></div>
+      <div class="panel-body">
+        <label class="field"><span>Admin anahtarı</span><input id="key" type="password" autocomplete="off" required></label>
+        <p id="login-error" class="error" hidden></p>
+        <button class="btn btn-green btn-big" type="submit">Giriş</button>
+      </div>
+    </form>
+
+    <div id="dash" hidden>
+      <div class="panel">
+        <div class="ribbon ribbon-gold"><span>Çekiliş · İlk 10</span></div>
+        <div class="panel-body">
+          <div class="facts">
+            <div class="fact"><small>Yarışma</small><b id="f-status">—</b></div>
+            <div class="fact"><small>Oyuncu</small><b id="f-players">0</b></div>
+            <div class="fact"><small>Toplam oyun</small><b id="f-games">0</b></div>
+            <div class="fact"><small>Yedek sayısı</small><b id="f-backups">0</b></div>
+          </div>
+          <p id="f-last" class="hint"></p>
+          <table>
+            <thead><tr><th>#</th><th>İsim</th><th>Mail</th><th>Skor</th><th>Oyun</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+          <div class="actions">
+            <button id="btn-freeze" class="btn btn-red" type="button">Yarışmayı Bitir</button>
+            <button id="btn-backup" class="btn btn-blue" type="button">Şimdi Yedekle</button>
+            <a id="btn-csv" class="btn btn-orange" style="text-align:center;text-decoration:none">CSV İndir</a>
+          </div>
+          <p id="msg" class="notice" hidden></p>
+        </div>
+      </div>
+    </div>
+  </main>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let key = sessionStorage.getItem('dino_admin') || '';
+    let frozen = false;
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+    async function call(path, body) {
+      const res = await fetch(path, {
+        method: body ? 'POST' : 'GET',
+        headers: { 'x-admin-key': key, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Hata');
+      return data;
+    }
+
+    function flash(text) { $('msg').textContent = text; $('msg').hidden = false; }
+
+    async function load() {
+      const d = await call('/api/admin/top?limit=10');
+      frozen = d.frozen;
+      $('login').hidden = true;
+      $('dash').hidden = false;
+      $('f-status').innerHTML = d.frozen ? '<span class="status-on">Bitti</span>' : '<span class="status-off">Devam ediyor</span>';
+      $('f-players').textContent = d.players;
+      $('f-games').textContent = d.games;
+      $('f-backups').textContent = d.backupCount;
+      $('f-last').textContent = (d.frozen ? `Bitiş: ${new Date(d.frozenAt).toLocaleString('tr-TR')} · ` : '') + `Son yedek: ${d.lastBackup || 'yok'}`;
+      $('btn-freeze').textContent = d.frozen ? 'Yarışmayı Yeniden Aç' : 'Yarışmayı Bitir';
+      $('btn-freeze').className = 'btn ' + (d.frozen ? 'btn-green' : 'btn-red');
+      $('btn-csv').href = `/api/admin/export.csv?key=${encodeURIComponent(key)}`;
+      $('rows').innerHTML = d.top.map((r) => `<tr><td>${r.rank}</td><td>${esc(r.name)}</td><td class="email">${esc(r.email)}</td><td>${r.best}</td><td>${r.games}</td></tr>`).join('')
+        || '<tr><td colspan="5">Henüz skor yok.</td></tr>';
+    }
+
+    $('login').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      key = $('key').value.trim();
+      try {
+        await load();
+        sessionStorage.setItem('dino_admin', key);
+      } catch (err) {
+        $('login-error').textContent = err.message;
+        $('login-error').hidden = false;
+      }
+    });
+
+    $('btn-freeze').addEventListener('click', async () => {
+      const next = !frozen;
+      const text = next
+        ? 'Yarışma bitirilsin mi? Bundan sonra oynanan oyunlar tabloya eklenmez ve tablo kesinleşir.'
+        : 'Yarışma yeniden açılsın mı? Skorlar tekrar tabloya yazılmaya başlar.';
+      if (!confirm(text)) return;
+      const r = await call('/api/admin/freeze', { frozen: next });
+      flash(`${next ? 'Yarışma bitirildi' : 'Yarışma yeniden açıldı'}. Yedek alındı: ${r.backup}`);
+      load();
+    });
+
+    $('btn-backup').addEventListener('click', async () => {
+      const r = await call('/api/admin/backup', {});
+      flash(`Yedek alındı: ${r.file}`);
+      load();
+    });
+
+    if (key) load().catch(() => { sessionStorage.removeItem('dino_admin'); });
+    setInterval(() => { if (!$('dash').hidden) load().catch(() => {}); }, 15000);
+  </script>
+</body>
+</html>
