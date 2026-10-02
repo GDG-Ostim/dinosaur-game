@@ -8,7 +8,7 @@
   <link rel="icon" href="assets/dino_base.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@700&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -39,8 +39,8 @@
   <!-- MENÜ -->
   <section id="screen-menu" class="screen">
     <div class="topbar">
-      <div class="chip chip-user"><span class="chip-icon">🦖</span><span id="menu-name">—</span></div>
-      <button id="btn-logout" class="btn btn-red btn-small" title="Çıkış">Çıkış</button>
+      <div class="chip chip-user"><span id="menu-avatar" class="avatar">?</span><span id="menu-name">—</span></div>
+      <button id="btn-logout" class="img-btn" title="Çıkış yap"><img src="assets/exit.png" alt="Çıkış"></button>
     </div>
     <img class="logo" src="assets/logo.png" alt="GDG Ostim Dino Run">
     <div class="hero">
@@ -48,7 +48,7 @@
     </div>
     <div class="stats">
       <div class="stat"><img src="assets/coin.png" alt=""><div><small>En iyi skor</small><b id="menu-best">0</b></div></div>
-      <div class="stat"><span class="stat-trophy">🏆</span><div><small>Sıralama</small><b id="menu-rank">—</b></div></div>
+      <div class="stat"><img src="assets/trophy.png" alt=""><div><small>Sıralama</small><b id="menu-rank">—</b></div></div>
     </div>
     <div class="menu-actions">
       <button id="btn-play" class="btn btn-green btn-huge">Oyna</button>
@@ -60,10 +60,10 @@
   <section id="screen-game" class="screen screen-game">
     <canvas id="game"></canvas>
     <div class="hud">
-      <button id="btn-quit" class="btn btn-icon btn-red" title="Menü">✕</button>
+      <button id="btn-quit" class="btn btn-icon btn-red" title="Menü"><i class="x-icon"></i></button>
       <div class="chip chip-score"><img src="assets/coin.png" alt=""><span id="hud-score">0</span></div>
       <div class="chip chip-best"><small>EN İYİ</small><span id="hud-best">0</span></div>
-      <button id="btn-mute" class="btn btn-icon btn-blue" title="Ses">🔊</button>
+      <button id="btn-mute" class="img-btn" title="Ses"><img id="mute-icon" src="assets/sound_on.png" alt="Ses"></button>
     </div>
     <div id="tap-hint" class="tap-hint">
       <div class="tap-card">
@@ -79,13 +79,14 @@
       <div class="ribbon ribbon-red"><span>Oyun Bitti!</span></div>
       <div class="panel-body center">
         <img class="over-dino" src="assets/dino_dead.png" alt="">
-        <div id="over-newbest" class="badge-new" hidden>⭐ Yeni Rekor! ⭐</div>
+        <div id="over-newbest" class="badge-new" hidden><img src="assets/medal.png" alt="">Yeni Rekor!</div>
         <div class="over-score"><small>Skor</small><b id="over-score">0</b></div>
         <div class="over-row">
           <div class="mini"><small>En iyi</small><b id="over-best">0</b></div>
           <div class="mini"><small>Sıralama</small><b id="over-rank">—</b></div>
         </div>
         <p id="over-error" class="error" hidden></p>
+        <p id="over-frozen" class="notice" hidden>Yarışma sona erdi, liderlik tablosu kesinleşti. Bu skor tabloya eklenmedi.</p>
         <button id="btn-again" class="btn btn-green btn-big">Tekrar Oyna</button>
         <div class="btn-row">
           <button id="btn-over-board" class="btn btn-blue">Liderlik</button>
@@ -99,8 +100,8 @@
   <section id="screen-board" class="screen">
     <div class="board panel">
       <div class="ribbon ribbon-gold"><span>Liderlik Tablosu</span></div>
-      <button id="btn-board-close" class="btn btn-icon btn-red panel-close" title="Kapat">✕</button>
-      <p class="board-sub">Koş, zıpla, zirveye çık! <span id="board-total"></span></p>
+      <button id="btn-board-close" class="btn btn-icon btn-red panel-close" title="Kapat"><i class="x-icon"></i></button>
+      <p class="board-sub"><span id="board-status">Koş, zıpla, zirveye çık!</span> <span id="board-total"></span></p>
       <ol id="board-list" class="board-list"></ol>
       <div id="board-me" class="board-me"></div>
       <button id="btn-board-play" class="btn btn-green btn-big">Oyna</button>

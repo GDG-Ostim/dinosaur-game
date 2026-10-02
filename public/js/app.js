@@ -43,6 +43,7 @@ function fmt(n) { return Number(n || 0).toLocaleString('tr-TR'); }
 
 function renderMenu() {
   $('menu-name').textContent = state.player?.name || '—';
+  $('menu-avatar').textContent = (state.player?.name || '?').trim().charAt(0).toLocaleUpperCase('tr-TR');
   $('menu-best').textContent = fmt(state.player?.best);
   $('menu-rank').textContent = state.rank ? `#${state.rank}` : '—';
 }
@@ -131,6 +132,7 @@ async function finishGame(score) {
   $('over-rank').textContent = state.rank ? `#${state.rank}` : '—';
   $('over-newbest').hidden = true;
   $('over-error').hidden = true;
+  $('over-frozen').hidden = true;
   $('modal-over').hidden = false;
   $('btn-again').focus();
   try {
@@ -142,6 +144,7 @@ async function finishGame(score) {
     $('over-best').textContent = fmt(res.best);
     $('over-rank').textContent = res.rank ? `#${res.rank}` : '—';
     $('over-newbest').hidden = !res.newBest;
+    $('over-frozen').hidden = !res.frozen;
     renderMenu();
   } catch (ex) {
     $('over-error').textContent = ex.message;
@@ -154,9 +157,10 @@ $('btn-again').addEventListener('click', startGame);
 $('btn-board-play').addEventListener('click', startGame);
 $('btn-quit').addEventListener('click', () => { state.game?.stop(); show('screen-menu'); });
 $('btn-over-menu').addEventListener('click', () => { $('modal-over').hidden = true; show('screen-menu'); });
-$('btn-mute').textContent = sfx.muted ? '🔇' : '🔊';
+const muteIcon = (m) => { $('mute-icon').src = m ? 'assets/sound_off.png' : 'assets/sound_on.png'; };
+muteIcon(sfx.muted);
 $('btn-mute').addEventListener('click', (e) => {
-  e.currentTarget.textContent = sfx.toggle() ? '🔇' : '🔊';
+  muteIcon(sfx.toggle());
   e.currentTarget.blur();
 });
 // Oyun bitti ekranında boşluk/enter ile tekrar.
@@ -188,9 +192,10 @@ async function loadBoard() {
     const data = await api('/api/leaderboard');
     const meId = data.me?.id;
     $('board-total').textContent = data.total ? `· ${data.total} oyuncu` : '';
+    $('board-status').textContent = data.frozen ? 'Yarışma sona erdi · Tablo kesinleşti' : 'Koş, zıpla, zirveye çık!';
     $('board-list').innerHTML = data.top.length
       ? data.top.map((r) => rowHtml(r, meId)).join('')
-      : '<li class="board-empty">Henüz skor yok. İlk sen ol! 🦖</li>';
+      : '<li class="board-empty">Henüz skor yok. İlk sen ol!</li>';
     const meInTop = data.top.some((r) => r.id === meId);
     $('board-me').innerHTML = data.me?.rank && !meInTop
       ? `<ol class="board-list" style="min-height:0;padding:6px">${rowHtml({ ...data.me }, meId)}</ol>`

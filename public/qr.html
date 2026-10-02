@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Dino Run · QR</title>
   <link rel="icon" href="assets/dino_base.png">
-  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@700&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
   <style>
     body { overflow: auto; }
@@ -27,7 +27,7 @@
     </div>
     <div class="board panel">
       <div class="ribbon ribbon-gold"><span>Liderlik Tablosu</span></div>
-      <p class="board-sub">Okut, oyna, zirveye çık! <span id="board-total"></span></p>
+      <p class="board-sub"><span id="board-status">Okut, oyna, zirveye çık!</span> <span id="board-total"></span></p>
       <ol id="board-list" class="board-list"></ol>
     </div>
   </main>
@@ -42,12 +42,13 @@
       try {
         const data = await (await fetch('/api/leaderboard?limit=10')).json();
         document.getElementById('board-total').textContent = data.total ? `· ${data.total} oyuncu` : '';
+        document.getElementById('board-status').textContent = data.frozen ? 'Yarışma sona erdi · Tablo kesinleşti' : 'Okut, oyna, zirveye çık!';
         document.getElementById('board-list').innerHTML = data.top.length ? data.top.map((r) => `
           <li class="row">
             <span class="rank${r.rank <= 3 ? ' r' + r.rank : ''}">${r.rank}</span>
             <span class="name">${esc(r.name)}</span>
             <span class="score"><img src="assets/coin.png" alt="">${r.best.toLocaleString('tr-TR')}</span>
-          </li>`).join('') : '<li class="board-empty">Henüz skor yok. İlk sen ol! 🦖</li>';
+          </li>`).join('') : '<li class="board-empty">Henüz skor yok. İlk sen ol!</li>';
       } catch { /* bir sonraki turda tekrar dener */ }
     }
     load();
