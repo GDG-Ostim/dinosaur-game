@@ -123,6 +123,11 @@ def isolate(img: Image.Image, labels: np.ndarray, keep: set[int], box) -> Image.
     return crop(out.crop(tuple(box[:4])))
 
 
+def has_alpha(img: Image.Image) -> bool:
+    """Görselde gerçekten şeffaf piksel var mı (RGBA ama opak beyaz olan çıktıları ayırır)."""
+    return img.mode == "RGBA" and (np.asarray(img)[:, :, 3] < 10).mean() > 0.05
+
+
 def save(img: Image.Image, name: str):
     img.save(OUT / f"{name}.png", optimize=True)
     print(f"  -> {name}.png {img.size}")
@@ -133,7 +138,9 @@ def sprite(src: str, name: str, max_h: int, tol: int = 38):
     if not p.exists():
         print(f"skip {src} (yok)")
         return
-    save(fit(crop(remove_white(Image.open(p), tol)), max_h), name)
+    img = Image.open(p)
+    img = img if has_alpha(img) else remove_white(img, tol)
+    save(fit(crop(img), max_h), name)
 
 
 def sheet(src: str, names: list[str], max_h: int):
@@ -155,7 +162,7 @@ def pose_sheet(src: str, names: list[str], target_h: int, holes: bool = False):
         return
     img = Image.open(p)
     # Zaten şeffaf (ör. Higgsfield arka plan silici çıktısı) ise beyaz silmeyi atla.
-    img = img if img.mode == "RGBA" else remove_white(img, holes=holes)
+    img = img if has_alpha(img) else remove_white(img, holes=holes)
     boxes, labels = components(img, min_area=200)
     boxes.sort(key=lambda b: (b[2] - b[0]) * (b[3] - b[1]), reverse=True)
     main = sorted(boxes[:len(names)], key=lambda b: b[0])
@@ -190,8 +197,8 @@ def background(src: str, name: str, top_ratio: float):
 if __name__ == "__main__":
     only = set(sys.argv[1:])
     jobs = {
-        "dino": lambda: (sprite("dino_base", "dino_base", 300),
-                         pose_sheet("dino_sheet", ["dino_run1", "dino_run2", "dino_jump", "dino_duck", "dino_dead"], 260)),
+        "dino": lambda: (sprite("dragon_hero_nobg", "dino_base", 360),
+                         pose_sheet("dragon_sheet", ["dino_run1", "dino_run2", "dino_jump", "dino_duck", "dino_dead"], 260)),
         "obstacles": lambda: sheet("obstacles", ["cactus1", "cactus2", "cactus3", "ptero", "coin", "rock"], 260),
         "icons": lambda: pose_sheet("icons_nobg", ["trophy", "medal", "sound_on", "sound_off", "exit"], 160),
         "bg": lambda: background("bg", "bg", 0.665),
